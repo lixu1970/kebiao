@@ -2,6 +2,10 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="app-version" content="260828-0704">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -67,7 +71,7 @@ button{height:44px;border:0;border-radius:10px;padding:0 8px;font-size:19px;font
     </div>
   </div>
   <div class="hint" id="hint">可查教师、教室；输入“一”或“一12”可快速找老师</div>
-  <div id="content" class="empty">输入 <b>刘运琦</b> 可查教师课表<br>输入 <b>D1</b> 可查该教室周一至周五谁在上课</div>
+  <div id="content"></div>
 </div>
 
 <div class="sheet" id="sheet">
@@ -245,3 +249,5 @@ q.addEventListener('change',()=>{ if(q.value.trim()) render(); });
 </script>
 </body>
 </html>
+
+<!-- kebiao-version: 260828-0704-find-teacher -->
