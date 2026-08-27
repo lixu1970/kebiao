@@ -32,6 +32,15 @@ button{height:44px;border:0;border-radius:10px;padding:0 8px;font-size:19px;font
 .meta{font-size:9px;color:#555;line-height:1.18;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .multi{position:absolute;right:3px;top:3px;font-size:8px;background:#111;color:#fff;border-radius:8px;padding:1px 4px}
 .empty{margin-top:80px;text-align:center;color:#777;font-size:14px;line-height:1.7}
+.finder{margin-top:8px}
+.finder-title{font-size:15px;font-weight:900;margin:8px 2px 6px}
+.finder-period{font-size:13px;font-weight:800;color:#555;margin:8px 2px 4px}
+.finder-list{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.finder-item{background:#fff;border:1px solid #e3e5e8;border-radius:8px;padding:8px 9px;min-height:48px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.finder-name{font-size:16px;font-weight:900;white-space:nowrap}
+.finder-room{font-size:14px;font-weight:800;color:#444;text-align:right;overflow-wrap:anywhere}
+.finder-none{background:#fafafa;border:1px solid #e3e5e8;border-radius:8px;padding:14px;text-align:center;color:#999;font-size:14px}
+
 .sheet{position:fixed;left:0;right:0;bottom:0;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.18);padding:12px 14px calc(14px + env(safe-area-inset-bottom));transform:translateY(110%);transition:.2s;z-index:9;max-height:76vh;overflow:auto}
 .sheet.show{transform:translateY(0)}
 .sheet h2{font-size:17px;margin:0 0 8px;padding-right:60px}
@@ -52,12 +61,12 @@ button{height:44px;border:0;border-radius:10px;padding:0 8px;font-size:19px;font
   <div class="top">
     <h1>课表查询</h1>
     <div class="search">
-      <input id="q" list="choices" placeholder="教师姓名 / 教室，如 D1" autocomplete="off">
+      <input id="q" list="choices" placeholder="教师 / 教室 / 一12" autocomplete="off">
       <datalist id="choices"></datalist>
       <button id="go">查询</button>
     </div>
   </div>
-  <div class="hint" id="hint">同一输入框：可查教师，也可查教室；空节显示“无课”</div>
+  <div class="hint" id="hint">可查教师、教室；输入“一”或“一12”可快速找老师</div>
   <div id="content" class="empty">输入 <b>刘运琦</b> 可查教师课表<br>输入 <b>D1</b> 可查该教室周一至周五谁在上课</div>
 </div>
 
@@ -78,6 +87,60 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 
 DATA.teachers.forEach(n=>{const o=document.createElement('option');o.value=n;o.label='教师';dl.appendChild(o)});
 DATA.rooms.forEach(n=>{const o=document.createElement('option');o.value=n;o.label='教室';dl.appendChild(o)});
+
+
+function parseFinderQuery(raw){
+  const v=String(raw??'').trim().replace(/\s+/g,'');
+  const m=v.match(/^(?:周)?([一二三四五])(?:(12|34|56))?$/);
+  if(!m) return null;
+  const dayMap={一:'周一',二:'周二',三:'周三',四:'周四',五:'周五'};
+  const periodMap={'12':'1、2','34':'3、4','56':'5、6'};
+  return {day:dayMap[m[1]], period:m[2]?periodMap[m[2]]:null, shortDay:m[1], shortPeriod:m[2]||''};
+}
+
+function finderRecords(day, period){
+  const rows=[];
+  Object.entries(DATA.records).forEach(([teacher,recs])=>{
+    recs.forEach(r=>{
+      if(r.day!==day) return;
+      if(period && r.period!==period) return;
+      rows.push({teacher,room:r.room,period:r.period});
+    });
+  });
+  const seen=new Set();
+  return rows.filter(r=>{
+    const k=[r.teacher,r.room,r.period].join('|');
+    if(seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+function renderFinder(f){
+  const rows=finderRecords(f.day,f.period);
+  q.value=f.shortDay+f.shortPeriod;
+  hint.innerHTML='<span class="mode">找老师：</span>'+esc(f.day)+(f.period?' '+esc(f.period)+'节':' 全天')+'｜仅显示教师和教室';
+
+  let out='<div class="finder"><div class="finder-title">'+esc(f.day)+(f.period?' '+esc(f.period)+'节':' 任课教师位置')+'</div>';
+  const periods=f.period?[f.period]:DATA.periods;
+  let any=false;
+
+  periods.forEach(period=>{
+    const arr=rows.filter(r=>r.period===period);
+    if(!arr.length) return;
+    any=true;
+    out+='<div class="finder-period">'+esc(period)+'节</div><div class="finder-list">';
+    arr.sort((a,b)=>a.teacher.localeCompare(b.teacher,'zh-CN')).forEach(r=>{
+      out+='<div class="finder-item"><div class="finder-name">'+esc(r.teacher)+'</div><div class="finder-room">'+esc(r.room)+'</div></div>';
+    });
+    out+='</div>';
+  });
+
+  if(!any) out+='<div class="finder-none">这一时段没有任课教师</div>';
+  out+='</div>';
+  content.className='';
+  content.innerHTML=out;
+}
 
 function resolve(raw){
   const v=raw.trim(), nv=norm(v);
@@ -104,7 +167,11 @@ function recordsFor(res){
 
 function render(){
   const raw=q.value.trim();
-  if(!raw){hint.textContent='请输入教师姓名或教室';return}
+  if(!raw){hint.textContent='请输入教师姓名、教室，或星期快捷码';return}
+
+  const finder=parseFinderQuery(raw);
+  if(finder){renderFinder(finder);return}
+
   const res=resolve(raw);
 
   if(!res || res.type==='ambiguous'){
